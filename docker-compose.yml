@@ -1,0 +1,54 @@
+version: '3'
+services:
+  pg-docker:
+    container_name: pg-docker
+    restart: always
+    image: postgres:alpine
+    ports:
+      - 5432:5432
+    volumes:
+      - $HOME/docker/volumes/postgres:/var/lib/postgresql/data
+      - ./postgres-seed:/docker-entrypoint-initdb.d #run these scripts on first container creation
+    environment: 
+      - POSTGRES_PASSWORD=docker
+  nodeapi:
+    build:
+      context: ./node-api-postgres
+    container_name: nodeapi
+    restart: always
+    ports:
+      - "3000:3000"
+    links: 
+      - pg-docker:db
+    depends_on:
+      - pg-docker
+    environment:
+      - DB_HOST=db
+      - DB_PASSWORD=docker
+      - DB_USER=postgres
+      - DB_NAME=postgres
+  pgweb:
+    container_name: pgweb  # optional
+    restart: always  # optional
+    image: sosedoff/pgweb
+    ports: 
+      - "8081:8081" 
+    links: 
+      - pg-docker:db  # my database container is called postgres, not db
+    environment:
+      - DATABASE_URL=postgres://postgres:docker@db:5432/postgres?sslmode=disable
+    depends_on:
+      - pg-docker # my database container is called postgres, not db
+  frontend: 
+    container_name: frontend
+    restart: always
+    build: 
+      context: ./cicd-app
+    ports: 
+      - 8080:80
+    links:
+      - nodeapi:backend
+    environment: 
+      - API_HOST=backend
+    depends_on: 
+      - nodeapi
